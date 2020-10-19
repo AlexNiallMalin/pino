@@ -112,6 +112,235 @@ test('redact option – child object', async ({ equal }) => {
   equal(req.headers.cookie, '[Redacted]')
 })
 
+test('child redact option', async ({ is }) => {
+  const stream = sink()
+  const instance = pino({ redact: ['req.headers.cookie'] }, stream)
+  const child = instance.child({ a: 'property' }, { redact: ['req.headers.connection'] })
+  child.info({
+    req: {
+      id: 7915,
+      method: 'GET',
+      url: '/',
+      headers: {
+        host: 'localhost:3000',
+        connection: 'keep-alive',
+        cookie: 'SESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1;'
+      },
+      remoteAddress: '::ffff:127.0.0.1',
+      remotePort: 58022
+    }
+  })
+  const { req } = await once(stream, 'data')
+  is(req.headers.connection, '[Redacted]')
+})
+
+test('child redact option - second level child', async ({ is }) => {
+  const stream = sink()
+  const instance = pino({ redact: ['req.headers.cookie'] }, stream)
+  const child = instance.child({ a: 'property' }, { redact: ['req.headers.connection'] })
+  const child2 = child.child({ another: 'prop' }, { redact: ['req.headers.host'] })
+  child2.info({
+    req: {
+      id: 7915,
+      method: 'GET',
+      url: '/',
+      headers: {
+        host: 'localhost:3000',
+        connection: 'keep-alive',
+        cookie: 'SESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1;'
+      },
+      remoteAddress: '::ffff:127.0.0.1',
+      remotePort: 58022
+    }
+  })
+  const { req } = await once(stream, 'data')
+  is(req.headers.cookie, '[Redacted]')
+  is(req.headers.connection, '[Redacted]')
+  is(req.headers.host, '[Redacted]')
+})
+
+test('child redact option – child top level redact', async ({ is }) => {
+  const stream = sink()
+  const instance = pino({ redact: ['req.headers.cookie'] }, stream)
+  const child = instance.child({ a: 'property' }, { redact: ['top'] })
+  child.info({
+    top: 'redact me',
+    req: {
+      id: 7915,
+      method: 'GET',
+      url: '/',
+      headers: {
+        host: 'localhost:3000',
+        connection: 'keep-alive',
+        cookie: 'SESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1;'
+      },
+      remoteAddress: '::ffff:127.0.0.1',
+      remotePort: 58022
+    }
+  })
+  const { req, top } = await once(stream, 'data')
+  is(top, '[Redacted]')
+  is(req.headers.cookie, '[Redacted]')
+})
+
+test('child redact option – no parent redact', async ({ is }) => {
+  const stream = sink()
+  const instance = pino(stream)
+  const child = instance.child({ a: 'property' }, { redact: ['req.headers.connection'] })
+  child.info({
+    req: {
+      id: 7915,
+      method: 'GET',
+      url: '/',
+      headers: {
+        host: 'localhost:3000',
+        connection: 'keep-alive',
+        cookie: 'SESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1;'
+      },
+      remoteAddress: '::ffff:127.0.0.1',
+      remotePort: 58022
+    }
+  })
+  const { req } = await once(stream, 'data')
+  is(req.headers.connection, '[Redacted]')
+})
+
+test('child redact option – parent top level redact', async ({ is }) => {
+  const stream = sink()
+  const instance = pino({ redact: ['top'] }, stream)
+  const child = instance.child({ a: 'property' }, { redact: ['req.headers.cookie'] })
+  child.info({
+    top: 'redact me',
+    req: {
+      id: 7915,
+      method: 'GET',
+      url: '/',
+      headers: {
+        host: 'localhost:3000',
+        connection: 'keep-alive',
+        cookie: 'SESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1;'
+      },
+      remoteAddress: '::ffff:127.0.0.1',
+      remotePort: 58022
+    }
+  })
+  const { req, top } = await once(stream, 'data')
+  is(top, '[Redacted]')
+  is(req.headers.cookie, '[Redacted]')
+})
+
+test('child redact option – child redaction should not affect parent redaction', async ({ isNot }) => {
+  const stream = sink()
+  const instance = pino({ redact: ['req.headers.cookie'] }, stream)
+  instance.child({ a: 'property' }, { redact: ['req.headers.connection'] })
+  instance.info({
+    req: {
+      id: 7915,
+      method: 'GET',
+      url: '/',
+      headers: {
+        host: 'localhost:3000',
+        connection: 'keep-alive',
+        cookie: 'SESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1;'
+      },
+      remoteAddress: '::ffff:127.0.0.1',
+      remotePort: 58022
+    }
+  })
+  const { req } = await once(stream, 'data')
+  isNot(req.headers.connection, '[Redacted]')
+})
+
+test('child redact option – child object - includes parent redact options', async ({ is }) => {
+  const stream = sink()
+  const instance = pino({ redact: ['req.headers.cookie'] }, stream)
+  const child = instance.child({ a: 'property' }, { redact: ['req.headers.connection'] })
+  child.info({
+    req: {
+      id: 7915,
+      method: 'GET',
+      url: '/',
+      headers: {
+        host: 'localhost:3000',
+        connection: 'keep-alive',
+        cookie: 'SESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1;'
+      },
+      remoteAddress: '::ffff:127.0.0.1',
+      remotePort: 58022
+    }
+  })
+  const { req } = await once(stream, 'data')
+  is(req.headers.cookie, '[Redacted]')
+})
+
+test('child redact option – child object - censor overrides parent redact options', async ({ is }) => {
+  const stream = sink()
+  const instance = pino({ redact: { paths: ['req.headers.cookie'], censor: 'FAIL' } }, stream)
+  const child = instance.child({ a: 'property' }, { redact: { paths: ['req.headers.cookie'], censor: 'TEST' } })
+  child.info({
+    req: {
+      id: 7915,
+      method: 'GET',
+      url: '/',
+      headers: {
+        host: 'localhost:3000',
+        connection: 'keep-alive',
+        cookie: 'SESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1;'
+      },
+      remoteAddress: '::ffff:127.0.0.1',
+      remotePort: 58022
+    }
+  })
+  const { req } = await once(stream, 'data')
+  is(req.headers.cookie, 'TEST')
+})
+
+test('child redact option – child object - censor function overrides parent redact options', async ({ is }) => {
+  const stream = sink()
+  const instance = pino({ redact: { paths: ['req.headers.cookie'], censor: 'FAIL' } }, stream)
+  const child = instance.child({ a: 'property' }, { redact: { paths: ['req.headers.cookie'], censor: () => 'TEST' } })
+  child.info({
+    req: {
+      id: 7915,
+      method: 'GET',
+      url: '/',
+      headers: {
+        host: 'localhost:3000',
+        connection: 'keep-alive',
+        cookie: 'SESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1;'
+      },
+      remoteAddress: '::ffff:127.0.0.1',
+      remotePort: 58022
+    }
+  })
+  const { req } = await once(stream, 'data')
+  is(req.headers.cookie, 'TEST')
+})
+
+test('child redact option – child redaction applies to bindings', async ({ is }) => {
+  const stream = sink()
+  const instance = pino({ redact: ['req.headers.cookie'] }, stream)
+  const bindings = {
+    req: {
+      id: 7915,
+      method: 'GET',
+      url: '/',
+      headers: {
+        host: 'localhost:3000',
+        connection: 'keep-alive',
+        cookie: 'SESSID=298zf09hf012fh2; csrftoken=u32t4o3tb3gg43; _gat=1;'
+      },
+      remoteAddress: '::ffff:127.0.0.1',
+      remotePort: 58022
+    }
+  }
+  const child = instance.child(bindings, { redact: ['req.headers.connection'] })
+  child.info({ a: 'property' })
+  const { req } = await once(stream, 'data')
+  is(req.headers.cookie, '[Redacted]')
+  is(req.headers.connection, '[Redacted]')
+})
+
 test('redact option – interpolated object', async ({ equal }) => {
   const stream = sink()
   const instance = pino({ redact: ['req.headers.cookie'] }, stream)
